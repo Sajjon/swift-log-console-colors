@@ -59,13 +59,15 @@ public struct ColorStreamLogHandler: LogHandler {
     public static func standardOutput(
         label: String,
         logIconType: LogIconType = .cool,
-        timeformat: String = Self.timeformatDefault
+        timeformat: String = Self.timeformatDefault,
+        hideLevel: Bool = false
     ) -> ColorStreamLogHandler {
         return ColorStreamLogHandler(
             label: label,
             stream: CustomStdioOutputStream.stdout,
             logIconType: logIconType,
-            timeformat: timeformat
+            timeformat: timeformat,
+            hideLevel: hideLevel
         )
     }
 
@@ -73,13 +75,15 @@ public struct ColorStreamLogHandler: LogHandler {
     public static func standardError(
         label: String,
         logIconType: LogIconType = .cool,
-        timeformat: String = Self.timeformatDefault
+        timeformat: String = Self.timeformatDefault,
+        hideLevel: Bool = false
     ) -> ColorStreamLogHandler {
         return ColorStreamLogHandler(
             label: label,
             stream: CustomStdioOutputStream.stderr,
             logIconType: logIconType,
-            timeformat: timeformat
+            timeformat: timeformat,
+            hideLevel: hideLevel
         )
     }
 
@@ -90,6 +94,8 @@ public struct ColorStreamLogHandler: LogHandler {
     private let logIconType:LogIconType
 
     public var logLevel: Logger.Level = .info
+    
+    private let hideLevel: Bool
 
     private var prettyMetadata: String?
     public var metadata = Logger.Metadata() {
@@ -112,12 +118,14 @@ public struct ColorStreamLogHandler: LogHandler {
         label: String,
         stream: TextOutputStream,
         logIconType: LogIconType,
-        timeformat: String = Self.timeformatDefault
+        timeformat: String = Self.timeformatDefault,
+        hideLevel: Bool = false
     ) {
         self.label = label
         self.stream = stream
         self.logIconType = logIconType
         self.timeformat = timeformat
+        self.hideLevel = hideLevel
     }
 
     public func log(
@@ -158,8 +166,9 @@ public struct ColorStreamLogHandler: LogHandler {
         
         
         let icon = logIconType.toIcon(logLevel: level)
+        let levelString = hideLevel ? "" : "\(level) "
 
-        return "\(self.timestamp(from: hardcodedTime)) \(icon) \(level) \(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)"
+        return "\(self.timestamp(from: hardcodedTime)) \(icon) \(levelString)\(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)"
     }
 
     private func prettify(_ metadata: Logger.Metadata) -> String? {

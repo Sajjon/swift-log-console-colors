@@ -63,6 +63,24 @@ final class SwiftLogConsoleColorsTests: XCTestCase {
         XCTAssertEqual(entryCustom, "14:13:12 🟦 info label : Foo")
     }
     
+    func testHideLevel() {
+        let loggerDefault = ColorStreamLogHandler.standardOutput(
+            label: "label",
+            logIconType: .rainbow
+        )
+        let loggerHideLabel = ColorStreamLogHandler.standardOutput(
+            label: "label",
+            logIconType: .rainbow,
+            hideLevel: true
+        )
+        
+        var timestamp = fifthOfDec2022
+        let entryDefault = loggerDefault.logEntry(message: "Foo", hardcodedTime: &timestamp)
+        let entryCustom = loggerHideLabel.logEntry(message: "Foo", hardcodedTime: &timestamp)
+        XCTAssertNotEqual(entryDefault, entryCustom)
+        XCTAssertEqual(entryCustom, "2022-12-15T14:13:12+0100 🟦 label : Foo")
+    }
+    
     func testExample() {
         //            LoggingSystem.bootstrap(ColorStreamLogHandler.standardOutput(label: "Label", logIconType: .cool))
         
