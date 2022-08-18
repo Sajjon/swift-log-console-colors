@@ -54,18 +54,39 @@ public enum LogIconType {
 /// `ColorStreamLogHandler` is a simple implementation of `LogHandler` for directing
 /// `Logger` output to either `stderr` or `stdout` via the factory methods.
 public struct ColorStreamLogHandler: LogHandler {
+   
     /// Factory that makes a `ColorStreamLogHandler` to directs its output to `stdout`
-    public static func standardOutput(label: String, logIconType:LogIconType = .cool) -> ColorStreamLogHandler {
-        return ColorStreamLogHandler(label: label, stream: CustomStdioOutputStream.stdout, logIconType: logIconType)
+    public static func standardOutput(
+        label: String,
+        logIconType: LogIconType = .cool,
+        timeformat: String = Self.timeformatDefault
+    ) -> ColorStreamLogHandler {
+        return ColorStreamLogHandler(
+            label: label,
+            stream: CustomStdioOutputStream.stdout,
+            logIconType: logIconType,
+            timeformat: timeformat
+        )
     }
 
     /// Factory that makes a `ColorStreamLogHandler` to directs its output to `stderr`
-    public static func standardError(label: String, logIconType:LogIconType = .cool) -> ColorStreamLogHandler {
-        return ColorStreamLogHandler(label: label, stream: CustomStdioOutputStream.stderr, logIconType: logIconType)
+    public static func standardError(
+        label: String,
+        logIconType: LogIconType = .cool,
+        timeformat: String = Self.timeformatDefault
+    ) -> ColorStreamLogHandler {
+        return ColorStreamLogHandler(
+            label: label,
+            stream: CustomStdioOutputStream.stderr,
+            logIconType: logIconType,
+            timeformat: timeformat
+        )
     }
 
     private let stream: TextOutputStream
     private let label: String
+    public static let timeformatDefault = "%Y-%m-%dT%H:%M:%S%z"
+    private let timeformat: String
     private let logIconType:LogIconType
 
     public var logLevel: Logger.Level = .info
@@ -87,28 +108,58 @@ public struct ColorStreamLogHandler: LogHandler {
     }
 
     // internal for testing only
-    internal init(label: String, stream: TextOutputStream, logIconType: LogIconType) {
+    internal init(
+        label: String,
+        stream: TextOutputStream,
+        logIconType: LogIconType,
+        timeformat: String = Self.timeformatDefault
+    ) {
         self.label = label
         self.stream = stream
         self.logIconType = logIconType
+        self.timeformat = timeformat
     }
 
-    public func log(level: Logger.Level,
-                    message: Logger.Message,
-                    metadata: Logger.Metadata?,
-                    source: String,
-                    file: String,
-                    function: String,
-                    line: UInt) {
+    public func log(
+        level: Logger.Level,
+        message: Logger.Message,
+        metadata: Logger.Metadata?,
+        source _: String, // unused
+        file: String,
+        function: String,
+        line: UInt
+    ) {
+        let entry = logEntry(
+            level: level,
+            message: message,
+            metadata: metadata,
+            file: file,
+            function: function,
+            line: line
+        )
+        
+        var stream = self.stream
+        stream.write(entry + "\n")
+    }
+    
+    internal func logEntry(
+        level: Logger.Level? = nil,
+        message: Logger.Message,
+        metadata: Logger.Metadata? = nil,
+        hardcodedTime: UnsafePointer<tm>? = nil,
+        file: String = #file,
+        function: String = #function,
+        line: UInt = #line
+    ) -> String {
+        let level = level ?? self.logLevel
         let prettyMetadata = metadata?.isEmpty ?? true
-            ? self.prettyMetadata
-            : self.prettify(self.metadata.merging(metadata!, uniquingKeysWith: { _, new in new }))
+        ? self.prettyMetadata
+        : self.prettify(self.metadata.merging(metadata!, uniquingKeysWith: { _, new in new }))
         
         
         let icon = logIconType.toIcon(logLevel: level)
 
-        var stream = self.stream
-        stream.write("\(self.timestamp()) \(icon) \(level) \(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)\n")
+        return "\(self.timestamp(from: hardcodedTime)) \(icon) \(level) \(self.label) :\(prettyMetadata.map { " \($0)" } ?? "") \(message)"
     }
 
     private func prettify(_ metadata: Logger.Metadata) -> String? {
@@ -117,20 +168,22 @@ public struct ColorStreamLogHandler: LogHandler {
             : nil
     }
 
-    private func timestamp() -> String {
+    private func timestamp(from hardcodedTime: UnsafePointer<tm>? = nil) -> String {
         var buffer = [Int8](repeating: 0, count: 255)
-        var timestamp = time(nil)
-        let localTime = localtime(&timestamp)
-        strftime(&buffer, buffer.count, "%Y-%m-%dT%H:%M:%S%z", localTime)
+        let time_ = hardcodedTime ?? {
+            var timestamp = time(nil)
+            let localTime = localtime(&timestamp)
+            return UnsafePointer(localTime)
+        }()
+        strftime(&buffer, buffer.count, timeformat, time_)
         return buffer.withUnsafeBufferPointer {
             $0.withMemoryRebound(to: CChar.self) {
                 String(cString: $0.baseAddress!)
             }
         }
     }
+    
 }
-
-
 
 /// A wrapper to facilitate `print`-ing to stderr and stdio that
 /// ensures access to the underlying `FILE` is locked to prevent
